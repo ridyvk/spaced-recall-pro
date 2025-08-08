@@ -1,5 +1,5 @@
 // ==== Spaced Recall Pro service worker ====
-const CACHE = 'srp-v8-5';
+const CACHE = 'srp-v8-8';
 
 const ASSETS = [
   './',
