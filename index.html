@@ -1006,7 +1006,158 @@ document.addEventListener("DOMContentLoaded", ()=>{
 });
 </script>
 
-<script>
+<script><script>
+(() => {
+  // ===== Graph hotfix (self-contained) =====
+  let mode = 'seq'; // 'seq' | 'totals' | 'streak'
+
+  // タブ切替（pill）
+  document.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+      mode = p.dataset.pc;
+      renderCharts();
+    });
+  });
+
+  // カード識別：いま表示中の問題文（prompt）の文字列をキーにする
+  const getCardKey = () => {
+    const c = document.getElementById('prompt')?.textContent?.trim() || '';
+    return 'srp_stats_' + c;
+  };
+
+  const loadArr = () => JSON.parse(localStorage.getItem(getCardKey()) || '[]');
+  const saveArr = (arr) => localStorage.setItem(getCardKey(), JSON.stringify(arr));
+
+  // 回答結果を追加（0=まだ,1=ふつう,2=覚えた）
+  const pushResult = (r) => {
+    const arr = loadArr();
+    arr.push({ t: Date.now(), r });
+    saveArr(arr);
+  };
+
+  // --- Spark（小さな折れ線） ---
+  function drawSpark(arr) {
+    const c = document.getElementById('spark'); if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+    const n = arr.length || 1;
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#60a5fa';
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x = (c.width - 10) * (i / Math.max(n - 1, 1)) + 5;
+      const r = (arr[i]?.r ?? 2);             // 0/1/2
+      const y = c.height - 10 - (r / 2) * (c.height - 20);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // --- メインカード（pcMain / pcInd） ---
+  function drawPc(arr) {
+    const c = document.getElementById('pcMain'); if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+
+    if (mode === 'seq') {
+      const w = Math.max(8, (c.width - 40) / Math.max(arr.length, 1) - 4);
+      arr.forEach((e, i) => {
+        const x = 20 + i * (w + 4);
+        const h = ((e.r + 1) / 3) * (c.height - 40);
+        const y = c.height - 20 - h;
+        ctx.fillStyle = e.r === 2 ? '#93c5fd' : e.r === 1 ? '#fde68a' : '#fecaca';
+        ctx.fillRect(x, y, w, h);
+      });
+    } else if (mode === 'totals') {
+      const total = arr.length;
+      const good = arr.filter(e => e.r === 2).length;
+      const bad  = arr.filter(e => e.r === 0).length;
+      const mid  = total - good - bad;
+      const vals = [good, mid, bad];
+      const labels = ['正', 'ふつう', '誤'];
+      const colors = ['#93c5fd', '#fde68a', '#fecaca'];
+
+      const barW = 80, gap = 40;
+      const baseX = c.width/2 - (1.5*barW + gap);
+      for (let i=0;i<3;i++){
+        const h = total ? (vals[i]/total) * (c.height-60) : 0;
+        const x = baseX + i*(barW+gap);
+        const y = c.height - 30 - h;
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(x,y,barW,h);
+        ctx.fillStyle = '#334155';
+        ctx.font = 'bold 16px "M PLUS 1p", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${labels[i]}:${vals[i]}`, x+barW/2, c.height-10);
+      }
+    } else {
+      // 連勝推移（pcMainに線、pcIndに丸点）
+      const seq = arr.map(e => e.r === 2 ? 1 : 0);
+      let streak = 0, maxStreak = 1;
+      const X = (i, n, pad=20) => pad + i * ((c.width - pad*2) / Math.max(n-1,1));
+      const Y = (s) => c.height - 30 - (s / Math.max(maxStreak,1)) * (c.height - 60);
+
+      // 最大連勝を先に計算
+      seq.forEach(v => { streak = v ? streak+1 : 0; maxStreak = Math.max(maxStreak, streak); });
+
+      // 再描画
+      streak = 0;
+      ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2; ctx.beginPath();
+      for (let i=0;i<seq.length;i++){
+        streak = seq[i] ? streak+1 : 0;
+        const x = X(i, seq.length), y = Y(streak);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      const ic = document.getElementById('pcInd')?.getContext('2d');
+      if (ic){
+        const c2 = document.getElementById('pcInd');
+        ic.clearRect(0,0,c2.width,c2.height);
+        const N = Math.min(seq.length, 20);
+        const start = seq.length - N;
+        for (let i=0;i<N;i++){
+          const v = seq[start+i];
+          const x = 20 + i * ((c2.width-40)/Math.max(N-1,1));
+          const y = c2.height/2;
+          ic.fillStyle = v ? '#60a5fa' : '#ef4444';
+          ic.beginPath(); ic.arc(x,y,6,0,Math.PI*2); ic.fill();
+        }
+      }
+    }
+  }
+
+  function renderCharts(){
+    const arr = loadArr();
+    drawSpark(arr);
+    drawPc(arr);
+  }
+
+  // 回答ボタンにフック（既存ロジックに加えて実行）
+  const hook = (id, r) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', () => { pushResult(r); renderCharts(); }, { passive:true });
+  };
+  hook('btnAgain', 0);
+  hook('btnHard',  1);
+  hook('btnGood',  2);
+
+  // 問題が切り替わったら自動再描画（promptの変化を監視）
+  const promptEl = document.getElementById('prompt');
+  if (promptEl){
+    const mo = new MutationObserver(() => renderCharts());
+    mo.observe(promptEl, { childList:true, subtree:true, characterData:true });
+  }
+
+  // 初期描画
+  window.addEventListener('load', renderCharts);
+})();
+</script>
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
