@@ -966,7 +966,7 @@ function updateCounts(){
   const ring = document.getElementById("ring"); ring.style.setProperty("--pct", pct+"%");
   document.getElementById("ringLabel").textContent = pct+"%";
 }
-document.getElementById("tagFilter").onchange=()=>{ pickNext(); updateCounts(); renderPerCard(true); };
+document.getElementById("tagFilter").onchange=()=>{ updateCounts(); renderChartsHF && renderChartsHF();// };
 
 function drawSpark(hist){
   const cvs = document.getElementById("spark"); const ctx = cvs.getContext("2d");
