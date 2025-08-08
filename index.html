@@ -1006,7 +1006,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 });
 </script>
 
-<script><script>
+<script>
 (() => {
   // ===== Graph hotfix (self-contained) =====
   let mode = 'seq'; // 'seq' | 'totals' | 'streak'
@@ -1157,7 +1157,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   window.addEventListener('load', renderCharts);
 })();
 </script>
-
+  
+<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
