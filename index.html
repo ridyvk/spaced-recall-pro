@@ -1008,61 +1008,61 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 <script>
 (() => {
-  // ===== Graph hotfix (self-contained) =====
-  let mode = 'seq'; // 'seq' | 'totals' | 'streak'
+      
+  // ===== Graph hotfix (no-conflict) =====
+  // タブ状態
+  let modeHF = 'seq'; // 'seq' | 'totals' | 'streak'
 
-  // タブ切替（pill）
+  // タブ切り替え
   document.querySelectorAll('.pill').forEach(p => {
     p.addEventListener('click', () => {
       document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
       p.classList.add('active');
-      mode = p.dataset.pc;
-      renderCharts();
+      modeHF = p.dataset.pc;
+      renderChartsHF();
     });
   });
 
-  // カード識別：いま表示中の問題文（prompt）の文字列をキーにする
-  const getCardKey = () => {
+  // カードごとの保存キー（表示中の単語で識別）
+  const getCardKeyHF = () => {
     const c = document.getElementById('prompt')?.textContent?.trim() || '';
     return 'srp_stats_' + c;
   };
+  const loadArrHF = () => JSON.parse(localStorage.getItem(getCardKeyHF()) || '[]');
+  const saveArrHF = (arr) => localStorage.setItem(getCardKeyHF(), JSON.stringify(arr));
 
-  const loadArr = () => JSON.parse(localStorage.getItem(getCardKey()) || '[]');
-  const saveArr = (arr) => localStorage.setItem(getCardKey(), JSON.stringify(arr));
-
-  // 回答結果を追加（0=まだ,1=ふつう,2=覚えた）
-  const pushResult = (r) => {
-    const arr = loadArr();
+  // 結果を保存（0=まだ,1=ふつう,2=覚えた）
+  const pushResultHF = (r) => {
+    const arr = loadArrHF();
     arr.push({ t: Date.now(), r });
-    saveArr(arr);
+    saveArrHF(arr);
   };
 
-  // --- Spark（小さな折れ線） ---
-  function drawSpark(arr) {
+  // 小さい折れ線（spark）
+  function drawSparkHF(arr) {
     const c = document.getElementById('spark'); if (!c) return;
     const ctx = c.getContext('2d');
     ctx.clearRect(0,0,c.width,c.height);
     const n = arr.length || 1;
-
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#60a5fa';
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
       const x = (c.width - 10) * (i / Math.max(n - 1, 1)) + 5;
-      const r = (arr[i]?.r ?? 2);             // 0/1/2
+      const r = (arr[i]?.r ?? 2);
       const y = c.height - 10 - (r / 2) * (c.height - 20);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
 
-  // --- メインカード（pcMain / pcInd） ---
-  function drawPc(arr) {
+  // 下のメイングラフ
+  function drawPcHF(arr) {
     const c = document.getElementById('pcMain'); if (!c) return;
     const ctx = c.getContext('2d');
     ctx.clearRect(0,0,c.width,c.height);
 
-    if (mode === 'seq') {
+    if (modeHF === 'seq') {
       const w = Math.max(8, (c.width - 40) / Math.max(arr.length, 1) - 4);
       arr.forEach((e, i) => {
         const x = 20 + i * (w + 4);
@@ -1071,7 +1071,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
         ctx.fillStyle = e.r === 2 ? '#93c5fd' : e.r === 1 ? '#fde68a' : '#fecaca';
         ctx.fillRect(x, y, w, h);
       });
-    } else if (mode === 'totals') {
+    } else if (modeHF === 'totals') {
       const total = arr.length;
       const good = arr.filter(e => e.r === 2).length;
       const bad  = arr.filter(e => e.r === 0).length;
@@ -1079,7 +1079,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
       const vals = [good, mid, bad];
       const labels = ['正', 'ふつう', '誤'];
       const colors = ['#93c5fd', '#fde68a', '#fecaca'];
-
       const barW = 80, gap = 40;
       const baseX = c.width/2 - (1.5*barW + gap);
       for (let i=0;i<3;i++){
@@ -1094,16 +1093,11 @@ document.addEventListener("DOMContentLoaded", ()=>{
         ctx.fillText(`${labels[i]}:${vals[i]}`, x+barW/2, c.height-10);
       }
     } else {
-      // 連勝推移（pcMainに線、pcIndに丸点）
       const seq = arr.map(e => e.r === 2 ? 1 : 0);
       let streak = 0, maxStreak = 1;
       const X = (i, n, pad=20) => pad + i * ((c.width - pad*2) / Math.max(n-1,1));
       const Y = (s) => c.height - 30 - (s / Math.max(maxStreak,1)) * (c.height - 60);
-
-      // 最大連勝を先に計算
       seq.forEach(v => { streak = v ? streak+1 : 0; maxStreak = Math.max(maxStreak, streak); });
-
-      // 再描画
       streak = 0;
       ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2; ctx.beginPath();
       for (let i=0;i<seq.length;i++){
@@ -1130,34 +1124,35 @@ document.addEventListener("DOMContentLoaded", ()=>{
     }
   }
 
-  function renderCharts(){
-    const arr = loadArr();
-    drawSpark(arr);
-    drawPc(arr);
+  function renderChartsHF(){
+    const arr = loadArrHF();
+    drawSparkHF(arr);
+    drawPcHF(arr);
   }
 
-  // 回答ボタンにフック（既存ロジックに加えて実行）
-  const hook = (id, r) => {
+  // 回答ボタンにフック
+  const hookHF = (id, r) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('click', () => { pushResult(r); renderCharts(); }, { passive:true });
+    el.addEventListener('click', () => { pushResultHF(r); renderChartsHF(); }, { passive:true });
   };
-  hook('btnAgain', 0);
-  hook('btnHard',  1);
-  hook('btnGood',  2);
+  hookHF('btnAgain', 0);
+  hookHF('btnHard',  1);
+  hookHF('btnGood',  2);
 
-  // 問題が切り替わったら自動再描画（promptの変化を監視）
+  // 単語が切り替わったら再描画
   const promptEl = document.getElementById('prompt');
   if (promptEl){
-    const mo = new MutationObserver(() => renderCharts());
+    const mo = new MutationObserver(() => renderChartsHF());
     mo.observe(promptEl, { childList:true, subtree:true, characterData:true });
   }
 
   // 初期描画
-  window.addEventListener('load', renderCharts);
+  window.addEventListener('load', renderChartsHF);
 })();
 </script>
-  
+
+// ===== Graph hotfix (no-conflict) =====
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
