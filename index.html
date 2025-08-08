@@ -966,7 +966,13 @@ function updateCounts(){
   const ring = document.getElementById("ring"); ring.style.setProperty("--pct", pct+"%");
   document.getElementById("ringLabel").textContent = pct+"%";
 }
-document.getElementById("tagFilter").onchange=()=>{ updateCounts(); renderChartsHF && renderChartsHF();// };
+document.getElementById("tagFilter").onchange = () => {
+  pickNext();                // タグ変えたら出題も更新
+  updateCounts();            // 数字更新
+  renderPerCard(true);       // 下のカード別グラフ更新
+  renderChartsHF && renderChartsHF();  // 追加したホットフィックス側も更新
+};
+
 
 function drawSpark(hist){
   const cvs = document.getElementById("spark"); const ctx = cvs.getContext("2d");
